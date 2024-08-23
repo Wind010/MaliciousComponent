@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RuntimeIdentifier>linux-ubuntu-20.04-x64</RuntimeIdentifier>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Message>SWYgeW91IGxpa2UgdGhpcyBwcm9qZWN0LCBsaWtlIGFuZCBzdWJzY3JpYmUuLi4gb3IganVzdCBnaW1tZSBhIHN0YXIu</Message>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="6.0.1" />
+  </ItemGroup>
+
+</Project>
